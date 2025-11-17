@@ -2,26 +2,35 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  build: {
-    rollupOptions: {
-      output: {
-        assetFileNames: 'assets/[name]-[ext]',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        manualChunks(id){
-          if (id.includes('node_modules')) {
-            return 'vendor';
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        name: 'Affiliate Site',
+        short_name: 'Affiliate',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#ffffff',
+        description: 'Affiliate voting app',
+        icons: [
+          {
+            src: '/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
           }
-        }
+        ]
       }
-    },
-    publicDir: 'public',
-
-    manifest: {
-      srcPath: './public/manifest.json',
-    }
+    })
+  ],
+  build: {
+    publicDir: 'public'
   }
 })
