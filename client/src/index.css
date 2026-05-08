@@ -398,20 +398,27 @@ table{width:100%;border-collapse:collapse}
   .breakdown-icon{font-size:40px;width:64px;height:64px}
 }
 .breakdown-content{display:flex;flex-direction:column;gap:8px;flex:1}
-.breakdown-label{font-size:13px;color:rgba(255,255,255,0.7);font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+.balance-breakdown-large .breakdown-label{font-size:13px;color:rgba(255,255,255,0.7);font-weight:500;text-transform:uppercase;letter-spacing:0.35px;line-height:1.2;word-break:break-word}
 @media (min-width:1024px){
-  .breakdown-label{font-size:14px}
+  .balance-breakdown-large .breakdown-label{font-size:14px}
 }
-.breakdown-value{font-size:24px;font-weight:900;color:#fff;letter-spacing:-0.5px}
+.balance-breakdown-large .breakdown-value{font-size:24px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.1}
 @media (min-width:1024px){
-  .breakdown-value{font-size:32px}
+  .balance-breakdown-large .breakdown-value{font-size:32px}
+}
+@media (max-width:480px){
+  .balance-breakdown-large{gap:10px}
+  .breakdown-card{padding:14px;gap:10px}
+  .breakdown-icon{width:44px;height:44px;font-size:24px;border-radius:12px}
+  .balance-breakdown-large .breakdown-label{font-size:11px;letter-spacing:0.25px}
+  .balance-breakdown-large .breakdown-value{font-size:20px}
 }
 
 /* Balance Breakdown - Small (deprecated, keeping for compatibility) */
 .balance-breakdown{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
 .breakdown-item{background:rgba(255,255,255,0.05);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,0.1)}
-.breakdown-label{font-size:12px;color:rgba(255,255,255,0.6);font-weight:500}
-.breakdown-value{font-size:18px;font-weight:700;color:#fff}
+.balance-breakdown .breakdown-label{font-size:12px;color:rgba(255,255,255,0.6);font-weight:500}
+.balance-breakdown .breakdown-value{font-size:18px;font-weight:700;color:#fff}
 
 /* Referral Section */
 .referral-section{margin-top:32px}

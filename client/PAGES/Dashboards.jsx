@@ -236,14 +236,14 @@ export default function Dashboards(){
           <div className="breakdown-card task">
             <div className="breakdown-icon">✅</div>
             <div className="breakdown-content">
-              <span className="breakdown-label">Task Balance</span>
+              <span className="breakdown-label" title="Task Balance">Task</span>
               <span className="breakdown-value">₦{profile.taskBalance || 0}</span>
             </div>
           </div>
           <div className="breakdown-card referral">
             <div className="breakdown-icon">👥</div>
             <div className="breakdown-content">
-              <span className="breakdown-label">Referral Balance</span>
+              <span className="breakdown-label" title="Referral Balance">Referral</span>
               <span className="breakdown-value">₦{profile.referralBalance || 0}</span>
             </div>
           </div>
