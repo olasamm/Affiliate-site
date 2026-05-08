@@ -19,19 +19,18 @@ import AdminSignup from '../PAGES/AdminSignup'
 
 
 function App() {
-  const [count, setCount] = useState(0)
 
 
   useEffect(() => { 
-    if ('serviceworker' in navigator){
+    if ('serviceWorker' in navigator){
       navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
         console.log(`Service Worker registered, ${reg}`)
         console.log(reg);
         
       })
-      .catch((err) => {
-        console.log(`Service Worker not registered, ${regError}`)
+      .catch((regError) => {
+        console.log(`Service Worker not registered: ${regError?.message || regError}`)
         console.log(regError);
         
       })
