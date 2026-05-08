@@ -10,7 +10,7 @@ const app = express();
 const URI = process.env.uri;
 const port = process.env.PORT
 const allowedOrigins = [
-    "https://affiliate-site-iedu.vercel.app",
+    "https://affiliate-site-5l6g.vercel.app",
     "http://localhost:5173",
     "http://localhost:3000",
 ];

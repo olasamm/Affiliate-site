@@ -3,14 +3,13 @@ import axios from 'axios';
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.DEV
-    ? 'http://localhost:9000'
-    : 'https://affiliate-sitee.onrender.com');
+    'https://affiliate-site-8km3.onrender.com');
 
 export const api = axios.create({
   baseURL: `${API_BASE}/api`,
   withCredentials: true,
   timeout: 20000,
-  
+
 });
 
 export const setAuthHeader = (token) => {
