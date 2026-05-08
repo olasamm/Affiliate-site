@@ -10,10 +10,59 @@ export default function Signup(){
   const [form, setForm] = useState({
     name:'', username:'', email:'', phone:'', bankName:'', accountNumber:'', password:'', planType:'5k', couponCode:'', invitationCode:''
   })
+  const [buyingCoupon, setBuyingCoupon] = useState(false)
+  const [showBuyCouponModal, setShowBuyCouponModal] = useState(false)
+
+  const planAmountMap = { "5k": 5000, "10k": 10000, "15k": 15000 }
   useEffect(()=>{
     const invite = sp.get('invite')
     if(invite) setForm(f=>({...f, invitationCode: invite}))
+    const paymentRef = sp.get('reference') || sp.get('trxref')
+    if (paymentRef) {
+      ;(async () => {
+        try {
+          const r = await api.get('/auth/coupon-payment/verify', { params: { reference: paymentRef } })
+          if (r?.data?.couponCode) {
+            setForm((f) => ({ ...f, couponCode: r.data.couponCode, planType: r.data.planType || f.planType }))
+            show(`Coupon generated: ${r.data.couponCode}`)
+          }
+        } catch (err) {
+          show(err?.response?.data?.message || 'Payment verification failed', 'error')
+        }
+      })()
+    }
   },[])
+
+  async function buyCouponCode() {
+    if (!form.email.trim()) {
+      show('Enter your email first before buying coupon', 'error')
+      return
+    }
+    try {
+      setBuyingCoupon(true)
+      const r = await api.post('/auth/coupon-payment/initiate', {
+        email: form.email.trim(),
+        planType: form.planType,
+      })
+      if (r?.data?.authorizationUrl) {
+        window.location.href = r.data.authorizationUrl
+      } else {
+        show('Unable to start payment', 'error')
+      }
+    } catch (err) {
+      show(err?.response?.data?.message || 'Unable to start coupon payment', 'error')
+    } finally {
+      setBuyingCoupon(false)
+    }
+  }
+
+  function openBuyCouponModal() {
+    if (!form.email.trim()) {
+      show('Enter your email first before buying coupon', 'error')
+      return
+    }
+    setShowBuyCouponModal(true)
+  }
 
   async function submit(e){
     e.preventDefault()
@@ -85,6 +134,9 @@ export default function Signup(){
           <div className="form-field">
             <label>Coupon Code</label>
             <input className="input" value={form.couponCode} onChange={e=>setForm({...form,couponCode:e.target.value})} required />
+            <button type="button" className="btn-secondary" style={{marginTop:8}} onClick={openBuyCouponModal} disabled={buyingCoupon}>
+              Buy Coupon Code
+            </button>
           </div>
           <div className="form-field">
             <label>Invitation Code</label>
@@ -101,6 +153,46 @@ export default function Signup(){
         </form>
         <p className="auth-footer">Need help? Contact support.</p>
       </div>
+
+      {showBuyCouponModal && (
+        <div className="modal-overlay" onClick={() => setShowBuyCouponModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Confirm Coupon Purchase</h3>
+              <button className="modal-close-btn" onClick={() => setShowBuyCouponModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="modal-balance-info">
+                <div className="modal-balance-item">
+                  <span className="modal-balance-label">Email:</span>
+                  <span className="modal-balance-value">{form.email}</span>
+                </div>
+                <div className="modal-balance-item">
+                  <span className="modal-balance-label">Plan:</span>
+                  <span className="modal-balance-value">{form.planType}</span>
+                </div>
+                <div className="modal-balance-item total">
+                  <span className="modal-balance-label">Amount to Pay:</span>
+                  <span className="modal-balance-value">₦{planAmountMap[form.planType]}</span>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowBuyCouponModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={buyCouponCode}
+                  disabled={buyingCoupon}
+                >
+                  {buyingCoupon ? 'Starting payment...' : 'Proceed to Pay'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

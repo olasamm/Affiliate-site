@@ -3,6 +3,9 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../model/userModel");
 const Coupon = require("../model/couponModel");
+const CouponPayment = require("../model/couponPaymentModel");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const router = express.Router();
 
@@ -10,6 +13,56 @@ function signToken(user) {
     return jwt.sign({ id: user._id, isAdmin: user.isAdmin }, process.env.JWT_SECRET, {
         expiresIn: "7d",
     });
+}
+
+let mailTransporter = null;
+function getMailer() {
+    if (mailTransporter) return mailTransporter;
+    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) return null;
+
+    mailTransporter = nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: Number(SMTP_PORT),
+        secure: Number(SMTP_PORT) === 465,
+        auth: {
+            user: SMTP_USER,
+            pass: SMTP_PASS,
+        },
+    });
+    return mailTransporter;
+}
+
+async function sendCouponEmail({ to, couponCode, planType, amount }) {
+    const transporter = getMailer();
+    if (!transporter) return false;
+
+    const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+    const subject = "Your Affiliate Coupon Code";
+    const text = `Payment successful.\n\nYour coupon code: ${couponCode}\nPlan: ${planType}\nAmount: ₦${amount}\n\nUse this code during signup.\n`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <h2>Payment Successful</h2>
+        <p>Your coupon code is ready:</p>
+        <p style="font-size: 20px; font-weight: 700; letter-spacing: 1px;">${couponCode}</p>
+        <p>Plan: <b>${planType}</b><br/>Amount: <b>₦${amount}</b></p>
+        <p>Use this code during signup.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({ from, to, subject, text, html });
+    return true;
+}
+
+const PLAN_PRICES = {
+    "5k": 5000,
+    "10k": 10000,
+    "15k": 15000,
+};
+
+function generateCouponCode(prefix = "CPN") {
+    const random = crypto.randomBytes(4).toString("hex").toUpperCase();
+    return `${prefix}-${random}`;
 }
 
 router.post("/register", async (req, res) => {
@@ -205,6 +258,112 @@ router.get("/me", (req, res) => {
 
 router.post("/logout", (req, res) => {
     res.clearCookie("token").json({ message: "Logged out" });
+});
+
+router.post("/coupon-payment/initiate", async (req, res) => {
+    try {
+        const { email, planType } = req.body;
+        if (!email || !planType) return res.status(400).json({ message: "email and planType are required" });
+        if (!PLAN_PRICES[planType]) return res.status(400).json({ message: "Invalid planType" });
+        if (!process.env.PAYSTACK_SECRET_KEY) return res.status(500).json({ message: "PAYSTACK_SECRET_KEY is not configured" });
+
+        const amount = PLAN_PRICES[planType];
+        const reference = `cp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        const callbackUrl = `${(process.env.FRONTEND_URL || "https://affiliate-site-5l6g.vercel.app").replace(/\/+$/, "")}/#/signup`;
+
+        await CouponPayment.create({ reference, email, planType, amount, status: "initialized" });
+
+        const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email,
+                amount: amount * 100, // kobo
+                reference,
+                callback_url: callbackUrl,
+                metadata: { planType },
+            }),
+        });
+
+        const initData = await initRes.json();
+        if (!initRes.ok || !initData?.status) {
+            return res.status(400).json({ message: initData?.message || "Failed to initialize payment" });
+        }
+
+        return res.json({
+            authorizationUrl: initData.data.authorization_url,
+            reference,
+        });
+    } catch (err) {
+        console.error("coupon-payment/initiate error:", err);
+        return res.status(500).json({ message: "Failed to initialize coupon payment" });
+    }
+});
+
+router.get("/coupon-payment/verify", async (req, res) => {
+    try {
+        const { reference } = req.query;
+        if (!reference) return res.status(400).json({ message: "reference is required" });
+        if (!process.env.PAYSTACK_SECRET_KEY) return res.status(500).json({ message: "PAYSTACK_SECRET_KEY is not configured" });
+
+        const payment = await CouponPayment.findOne({ reference });
+        if (!payment) return res.status(404).json({ message: "Payment record not found" });
+
+        // Idempotent: if already successful, reuse issued coupon
+        if (payment.status === "success" && payment.couponCode) {
+            return res.json({ message: "Payment already verified", couponCode: payment.couponCode, planType: payment.planType });
+        }
+
+        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+            headers: {
+                Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            },
+        });
+        const verifyData = await verifyRes.json();
+
+        if (!verifyRes.ok || !verifyData?.status || verifyData?.data?.status !== "success") {
+            payment.status = "failed";
+            await payment.save();
+            return res.status(400).json({ message: verifyData?.message || "Payment verification failed" });
+        }
+
+        // Create a unique coupon and persist
+        let code = generateCouponCode("CPN");
+        while (await Coupon.findOne({ code })) {
+            code = generateCouponCode("CPN");
+        }
+
+        await Coupon.create({
+            code,
+            planType: payment.planType,
+            amount: payment.amount,
+            status: "unused",
+        });
+
+        payment.status = "success";
+        payment.couponCode = code;
+        await payment.save();
+
+        // Best-effort email delivery (does not block coupon issuance)
+        try {
+            await sendCouponEmail({
+                to: payment.email,
+                couponCode: code,
+                planType: payment.planType,
+                amount: payment.amount,
+            });
+        } catch (mailErr) {
+            console.error("Coupon email send failed:", mailErr?.message || mailErr);
+        }
+
+        return res.json({ message: "Payment verified", couponCode: code, planType: payment.planType });
+    } catch (err) {
+        console.error("coupon-payment/verify error:", err);
+        return res.status(500).json({ message: "Failed to verify coupon payment" });
+    }
 });
 
 module.exports = router;
