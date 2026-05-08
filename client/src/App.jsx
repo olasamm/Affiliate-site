@@ -23,18 +23,15 @@ function App() {
 
   useEffect(() => { 
     if ('serviceWorker' in navigator){
-      navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log(`Service Worker registered, ${reg}`)
-        console.log(reg);
-        
+      navigator.serviceWorker.getRegistrations()
+      .then((registrations) => {
+        registrations.forEach((registration) => registration.unregister())
+        console.log(`Service Workers unregistered: ${registrations.length}`)
       })
       .catch((regError) => {
-        console.log(`Service Worker not registered: ${regError?.message || regError}`)
+        console.log(`Service Worker cleanup failed: ${regError?.message || regError}`)
         console.log(regError);
-        
       })
-
     }
   }, []);
 
