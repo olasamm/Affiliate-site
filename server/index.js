@@ -9,8 +9,29 @@ const app = express();
 
 const URI = process.env.uri;
 const port = process.env.PORT
+const allowedOrigins = [
+    "https://affiliate-site-iedu.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+];
 
-app.use(cors({ origin: true, credentials: true }));
+const corsOptions = {
+    origin(origin, callback) {
+        if (!origin) return callback(null, true);
+
+        const isExplicitlyAllowed = allowedOrigins.includes(origin);
+        const isVercelPreview = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+
+        if (isExplicitlyAllowed || isVercelPreview) return callback(null, true);
+        return callback(new Error("CORS blocked for origin: " + origin));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

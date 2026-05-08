@@ -4,7 +4,7 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.DEV
     ? 'http://localhost:9000'
-    : 'https://affiliate-site-n213.onrender.com');
+    : 'https://affiliate-sitee.onrender.com');
 
 export const api = axios.create({
   baseURL: `${API_BASE}/api`,
