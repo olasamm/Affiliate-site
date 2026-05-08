@@ -10,6 +10,7 @@ export const api = axios.create({
   baseURL: `${API_BASE}/api`,
   withCredentials: true,
   timeout: 20000,
+  
 });
 
 export const setAuthHeader = (token) => {
