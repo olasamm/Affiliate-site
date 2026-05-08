@@ -16,6 +16,14 @@ const userSchema = new mongoose.Schema(
         invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
         usedCouponCode: { type: String },
         isAdmin: { type: Boolean, default: false },
+        completedTasks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Task" }],
+        taskSubmissions: [
+            {
+                taskId: { type: mongoose.Schema.Types.ObjectId, ref: "Task", required: true },
+                proof: { type: String, required: true },
+                submittedAt: { type: Date, default: Date.now },
+            },
+        ],
     },
     { timestamps: true }
 );

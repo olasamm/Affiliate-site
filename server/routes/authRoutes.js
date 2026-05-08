@@ -121,6 +121,18 @@ router.post("/register", async (req, res) => {
             const reward = rewardBase * multiplier;
             invitedByUser.referralBalance += reward;
             await invitedByUser.save();
+
+            // Record transaction for referral reward
+            try {
+                await Transaction.create({
+                    userId: invitedByUser._id,
+                    type: "referral",
+                    amount: reward,
+                    meta: { referredUserId: user._id, referredUsername: username }
+                });
+            } catch (txErr) {
+                console.error("Failed to create referral transaction:", txErr);
+            }
         }
 
         const token = signToken(user);
@@ -196,6 +208,3 @@ router.post("/logout", (req, res) => {
 });
 
 module.exports = router;
-
-
-

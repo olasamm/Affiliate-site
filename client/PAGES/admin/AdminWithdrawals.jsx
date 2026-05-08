@@ -12,12 +12,13 @@ export default function AdminWithdrawals(){
       <h3 className="feat-title" style={{margin:0}}>Withdrawals</h3>
       <div style={{marginTop:12,display:'grid',gap:10}}>
         {list.map(w => (
-          <div key={w._id} className="card" style={{padding:12,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div key={w._id} className="card" style={{padding:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
             <div>
               <div style={{fontWeight:700}}>₦{w.amount} • {w?.userId?.username}</div>
+              <div className="muted" style={{fontSize:13}}>Source: {w.source || 'legacy'}</div>
               <div className="muted" style={{fontSize:13}}>{w.bankName} • {w.accountNumber}</div>
             </div>
-            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end'}}>
               <span style={{fontSize:13,color: w.status==='Approved'?'#065f46': w.status==='Rejected'?'#7f1d1d':'var(--text)'}}>{w.status}</span>
               <button onClick={()=>approve(w._id)} className="btn" style={{background:'#10b981',color:'#fff',padding:'8px 10px',borderRadius:10}}>Approve</button>
               <button onClick={()=>reject(w._id)} className="btn" style={{background:'#ef4444',color:'#fff',padding:'8px 10px',borderRadius:10}}>Reject</button>

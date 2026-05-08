@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { api } from '../src/api'
+import { api, setAuthHeader } from '../src/api'
 
 export default function AdminSignup(){
   const navigate = useNavigate()
@@ -9,7 +9,11 @@ export default function AdminSignup(){
   async function submit(e){
     e.preventDefault()
     try{
-      await api.post('/auth/register', { ...form })
+      const registerRes = await api.post('/auth/register', { ...form })
+      const token = registerRes.data?.token
+      if (token) {
+        setAuthHeader(token)
+      }
       const me = await api.get('/auth/me')
       if(!me.data?.isAdmin){
         alert('Invalid admin secret')

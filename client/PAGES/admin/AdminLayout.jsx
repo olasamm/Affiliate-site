@@ -4,7 +4,7 @@ export default function AdminLayout(){
   return (
     <div style={{minHeight:'100vh',background:'var(--bg)'}}>
       <div className="container" style={{paddingTop:20,paddingBottom:20}}>
-        <div className="card" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div className="card" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
           <h1 className="feat-title" style={{margin:0}}>Admin Dashboard</h1>
           <nav style={{display:'flex',gap:12,flexWrap:'wrap'}}>
             <Link to="/admin" className="btn btn-secondary">Overview</Link>

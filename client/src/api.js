@@ -5,6 +5,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://affiliate-1-8ebu.onre
 export const api = axios.create({
   baseURL: `${API_BASE}/api`,
   withCredentials: true,
+  timeout: 20000,
 });
 
 export const setAuthHeader = (token) => {

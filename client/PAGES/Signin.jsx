@@ -8,9 +8,12 @@ export default function Signin(){
   const { show } = useToast()
   const [emailOrUsername, setId] = useState('')
   const [password, setPw] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   async function submit(e){
     e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
     try{
       const loginRes = await api.post('/auth/login', { emailOrUsername, password })
       const token = loginRes.data?.token
@@ -18,9 +21,6 @@ export default function Signin(){
         document.cookie = `token=${token}; path=/;`;
         setAuthHeader(token);
         localStorage.setItem('token', token);
-        // Debug: log token and Axios header
-        console.log('JWT token:', token);
-        console.log('Axios Authorization header:', api.defaults.headers.common['Authorization']);
       }
       // Only proceed if /auth/me succeeds
       try {
@@ -31,13 +31,23 @@ export default function Signin(){
           show('Logged in successfully')
           navigate('/dashboard')
         } else {
-          show('Authentication failed', 'error')
+          show('Login succeeded but session check failed', 'error')
         }
       } catch (authErr) {
-        show(authErr?.response?.data?.message || 'Authentication failed', 'error')
+        const msg = authErr?.response?.data?.message || (authErr?.code === 'ECONNABORTED' ? 'Session check timed out. Please retry.' : 'Authentication failed after login')
+        show(msg, 'error')
       }
     }catch(err){
-      show(err?.response?.data?.message || 'Login failed', 'error')
+      const msg =
+        err?.response?.data?.message ||
+        (err?.code === 'ECONNABORTED'
+          ? 'Login request timed out. Please check your backend and network.'
+          : err?.request
+            ? 'Cannot reach server. Please ensure backend is running.'
+            : 'Login failed')
+      show(msg, 'error')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -75,7 +85,9 @@ export default function Signin(){
               autoComplete="current-password"
             />
           </div>
-          <button className="btn-primary">Sign In</button>
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? 'Signing in...' : 'Sign In'}
+          </button>
           <p className="auth-alt">Don't have an account? <Link to="/signup" className="text-link">Sign up</Link></p>
         </form>
         <p className="auth-footer">By continuing, you agree to our Terms and Privacy Policy.</p>

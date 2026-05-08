@@ -17,6 +17,7 @@ import AdminSignin from '../PAGES/AdminSignin'
 import AdminSignup from '../PAGES/AdminSignup'
 
 
+
 function App() {
   const [count, setCount] = useState(0)
 
@@ -51,6 +52,7 @@ function App() {
         <Route path="/admin-signup" element={<AdminSignup />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboards /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        {/* <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} /> */}
         <Route path="/admin" element={<RoleRoute requireAdmin={true}><AdminLayout /></RoleRoute>} >
           <Route index element={<AdminOverview />} />
           <Route path="coupons" element={<AdminCoupons />} />
@@ -69,3 +71,4 @@ function App() {
 }
 
 export default App
+

@@ -5,6 +5,7 @@ const Coupon = require("../model/couponModel");
 const Task = require("../model/taskModel");
 const User = require("../model/userModel");
 const Withdrawal = require("../model/withdrawalModel");
+const WithdrawalSetting = require("../model/withdrawalSettingModel");
 const multer = require('multer');
 const cloudinary = require('../utils/cloudinary');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -57,6 +58,41 @@ router.get("/overview", requireAdmin, async (req, res) => {
         Task.countDocuments(),
     ]);
     res.json({ totalUsers, coupons: { total: couponsTotal, used: couponsUsed, unused: couponsUnused }, pendingWithdrawals, totalTasks });
+});
+
+router.get("/withdrawal-settings", requireAdmin, async (req, res) => {
+    let setting = await WithdrawalSetting.findOne({ key: "global" });
+    if (!setting) {
+        setting = await WithdrawalSetting.create({ key: "global", enabled: true, autoCloseMinutes: 60, endAt: null });
+    }
+    res.json(setting);
+});
+
+router.patch("/withdrawal-settings", requireAdmin, async (req, res) => {
+    const { enabled, autoCloseMinutes } = req.body;
+    const updates = {};
+    const currently = await WithdrawalSetting.findOne({ key: "global" });
+    const currentMinutes = currently?.autoCloseMinutes || 60;
+    const minutesToUse = autoCloseMinutes !== undefined ? Number(autoCloseMinutes) : currentMinutes;
+
+    if (!Number.isFinite(minutesToUse) || minutesToUse <= 0) return res.status(400).json({ message: "autoCloseMinutes must be a positive number" });
+    updates.autoCloseMinutes = minutesToUse;
+
+    if (enabled !== undefined) {
+        updates.enabled = !!enabled;
+        if (updates.enabled) {
+            updates.endAt = new Date(Date.now() + minutesToUse * 60 * 1000);
+        } else {
+            updates.endAt = null;
+        }
+    }
+
+    const setting = await WithdrawalSetting.findOneAndUpdate(
+        { key: "global" },
+        { $set: updates, $setOnInsert: { key: "global" } },
+        { new: true, upsert: true }
+    );
+    res.json(setting);
 });
 
 // Users list
@@ -168,12 +204,34 @@ router.get("/withdrawals", requireAdmin, async (req, res) => {
 });
 
 router.post("/withdrawals/:id/approve", requireAdmin, async (req, res) => {
-    const wd = await Withdrawal.findByIdAndUpdate(req.params.id, { status: "Approved" }, { new: true });
+    const wd = await Withdrawal.findById(req.params.id);
+    if (!wd) return res.status(404).json({ message: "Withdrawal not found" });
+    if (wd.status !== "Pending") return res.status(400).json({ message: "Withdrawal already processed" });
+    // Balance is already deducted at request time.
+    wd.status = "Approved";
+    await wd.save();
     res.json(wd);
 });
 
 router.post("/withdrawals/:id/reject", requireAdmin, async (req, res) => {
-    const wd = await Withdrawal.findByIdAndUpdate(req.params.id, { status: "Rejected" }, { new: true });
+    const wd = await Withdrawal.findById(req.params.id);
+    if (!wd) return res.status(404).json({ message: "Withdrawal not found" });
+    if (wd.status !== "Pending") return res.status(400).json({ message: "Withdrawal already processed" });
+    if (!["task", "referral"].includes(wd.source)) return res.status(400).json({ message: "Invalid withdrawal source on record" });
+
+    const user = await User.findById(wd.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Refund the amount back to the original source on rejection.
+    if (wd.source === "task") {
+        user.taskBalance += wd.amount;
+    } else {
+        user.referralBalance += wd.amount;
+    }
+    await user.save();
+
+    wd.status = "Rejected";
+    await wd.save();
     res.json(wd);
 });
 

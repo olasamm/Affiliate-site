@@ -12,6 +12,10 @@ export default function Dashboards(){
   const [activeTab, setActiveTab] = useState('home')
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
   const [withdrawalAmount, setWithdrawalAmount] = useState('')
+  const [withdrawalSource, setWithdrawalSource] = useState('task')
+  const [showTaskProofModal, setShowTaskProofModal] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState(null)
+  const [proofFile, setProofFile] = useState(null)
   const { show } = useToast()
   const navigate = useNavigate();
 
@@ -35,23 +39,52 @@ export default function Dashboards(){
     })()
   },[])
 
-  async function completeTask(id){
-    const res = await api.post(`/user/tasks/${id}/complete`)
-    show(`+₦${res.data.taskReward} added to Task Balance`, 'success')
-    const me = await api.get('/user/profile')
-    setProfile(me.data)
-    const t = await api.get('/user/tasks')
-    setTasks(t.data)
+  function openTaskProofModal(taskId){
+    setSelectedTaskId(taskId)
+    setProofFile(null)
+    setShowTaskProofModal(true)
+  }
+
+  function closeTaskProofModal(){
+    setSelectedTaskId(null)
+    setProofFile(null)
+    setShowTaskProofModal(false)
+  }
+
+  async function completeTaskWithProof(e){
+    e.preventDefault()
+    if (!selectedTaskId) return
+    if (!proofFile) {
+      show('Please select an image proof', 'error')
+      return
+    }
+    try{
+      const formData = new FormData()
+      formData.append('proofImage', proofFile)
+      const res = await api.post(`/user/tasks/${selectedTaskId}/complete`, formData)
+      show(`+₦${res.data.taskReward} added to Task Balance`, 'success')
+      const me = await api.get('/user/profile')
+      setProfile(me.data)
+      const t = await api.get('/user/tasks')
+      setTasks(t.data)
+      closeTaskProofModal()
+    }catch(err){
+      show(err?.response?.data?.message || 'Unable to complete task', 'error')
+      const t = await api.get('/user/tasks')
+      setTasks(t.data)
+    }
   }
 
   function openWithdrawalModal(){
     setShowWithdrawalModal(true)
     setWithdrawalAmount('')
+    setWithdrawalSource('task')
   }
 
   function closeWithdrawalModal(){
     setShowWithdrawalModal(false)
     setWithdrawalAmount('')
+    setWithdrawalSource('task')
   }
 
   async function submitWithdrawal(e){
@@ -61,9 +94,13 @@ export default function Dashboards(){
       show('Please enter a valid amount', 'error')
       return
     }
-    const total = (profile.taskBalance||0) + (profile.referralBalance||0)
-    if(amount > total) {
-      show('Insufficient balance', 'error')
+    if(!['task', 'referral'].includes(withdrawalSource)) {
+      show('Please select balance source', 'error')
+      return
+    }
+    const selectedBalance = withdrawalSource === 'task' ? (profile.taskBalance||0) : (profile.referralBalance||0)
+    if(amount > selectedBalance) {
+      show(`Insufficient ${withdrawalSource} balance`, 'error')
       return
     }
     const bankName = profile.bankName
@@ -73,7 +110,7 @@ export default function Dashboards(){
       return
     }
     try {
-    await api.post('/user/withdrawals', { amount, bankName, accountNumber })
+    await api.post('/user/withdrawals', { amount, source: withdrawalSource, bankName, accountNumber })
       show('Withdrawal request submitted successfully', 'success')
     const w = await api.get('/user/withdrawals')
     setWithdrawals(w.data)
@@ -260,8 +297,12 @@ export default function Dashboards(){
                             </a>
                           )}
                         </div>
-                        <button onClick={() => completeTask(t._id)} className="task-complete-btn">
-                          Complete
+                        <button
+                          onClick={() => openTaskProofModal(t._id)}
+                          className="task-complete-btn"
+                          disabled={!!t.completed}
+                        >
+                          {t.completed ? 'Completed' : 'Complete'}
                         </button>
                       </div>
                     ))
@@ -286,6 +327,9 @@ export default function Dashboards(){
                               day: 'numeric',
                               year: 'numeric'
                             })}
+                          </div>
+                          <div className="withdrawal-date">
+                            Source: {w.source || 'legacy'}
                           </div>
                         </div>
                         <div className={`withdrawal-status status-${w.status.toLowerCase()}`}>
@@ -349,8 +393,12 @@ export default function Dashboards(){
                         </a>
                       )}
                     </div>
-                    <button onClick={() => completeTask(t._id)} className="task-complete-btn">
-                      Complete
+                    <button
+                      onClick={() => openTaskProofModal(t._id)}
+                      className="task-complete-btn"
+                      disabled={!!t.completed}
+                    >
+                      {t.completed ? 'Completed' : 'Complete'}
                     </button>
                   </div>
                 ))
@@ -378,6 +426,7 @@ export default function Dashboards(){
                             year: 'numeric'
                           })}
                         </div>
+                        <div className="withdrawal-date">Source: {w.source || 'legacy'}</div>
                         <div className="withdrawal-bank">{w.bankName} • {w.accountNumber}</div>
                       </div>
                     </div>
@@ -555,6 +604,20 @@ export default function Dashboards(){
                   <span className="modal-balance-value">₦{((profile.taskBalance||0) + (profile.referralBalance||0))}</span>
                 </div>
               </div>
+
+              <div className="form-field">
+                <label htmlFor="withdrawal-source">Withdraw From</label>
+                <select
+                  id="withdrawal-source"
+                  className="input"
+                  value={withdrawalSource}
+                  onChange={(e) => setWithdrawalSource(e.target.value)}
+                  required
+                >
+                  <option value="task">Task Balance</option>
+                  <option value="referral">Referral Balance</option>
+                </select>
+              </div>
               
               <div className="form-field">
                 <label htmlFor="withdrawal-amount">Withdrawal Amount (₦)</label>
@@ -566,7 +629,7 @@ export default function Dashboards(){
                   value={withdrawalAmount}
                   onChange={(e) => setWithdrawalAmount(e.target.value)}
                   min="1"
-                  max={(profile.taskBalance||0) + (profile.referralBalance||0)}
+                  max={withdrawalSource === 'task' ? (profile.taskBalance||0) : (profile.referralBalance||0)}
                   required
                   autoFocus
                 />
@@ -595,6 +658,41 @@ export default function Dashboards(){
                 </button>
                 <button type="submit" className="btn-primary">
                   Submit Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showTaskProofModal && (
+        <div className="modal-overlay" onClick={closeTaskProofModal}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Upload Task Proof</h3>
+              <button className="modal-close-btn" onClick={closeTaskProofModal}>×</button>
+            </div>
+            <form onSubmit={completeTaskWithProof} className="modal-body">
+              <div className="form-field">
+                <label htmlFor="task-proof-file">Proof Image</label>
+                <input
+                  id="task-proof-file"
+                  type="file"
+                  className="input"
+                  accept="image/*"
+                  onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                  required
+                />
+              </div>
+              <div className="muted" style={{fontSize: 13}}>
+                Choose a screenshot/photo from your phone or computer to verify task completion.
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={closeTaskProofModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Submit Proof
                 </button>
               </div>
             </form>
